@@ -1,0 +1,6 @@
+data
+tmp
+__pycache__
+.env
+*.DS_*
+._*

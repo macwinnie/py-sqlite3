@@ -1,0 +1,52 @@
+---
+
+name: "Build python library and publish to PyPI"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "master"
+
+env:
+  INC_VERSION:    true
+  WD_PATH:        "package_repo"
+  TWINE_USERNAME: "__token__"
+  TWINE_PASSWORD: "${{ secrets.TWINE_PASSWORD }}"
+
+jobs:
+
+  build-and-documentation:
+
+    runs-on: "ubuntu-latest"
+
+    container:
+      image: "python:3-bullseye"
+
+    steps:
+
+      - name: "Checkout this repository"
+        uses: "actions/checkout@v2"
+        with:
+          ref: "master"
+          path: "${{ env.WD_PATH }}"
+
+      - uses: psf/black@stable
+        with:
+          options: "--line-length 100 --verbose"
+          src: "${{ env.WD_PATH }}"
+
+      - name: "Build documentation and package"
+        run: |
+          cd ./${{ env.WD_PATH }}
+          bash wf_prep.sh
+
+      - name: "Publish Git repository with last built state"
+        uses: "stefanzweifel/git-auto-commit-action@v4"
+        with:
+          commit_message:    "Publish last built version"
+          commit_user_name:  "GitHub Actions"
+          commit_user_email: "dev@macwinnie.me"
+          repository:        "./${{ env.WD_PATH }}"
+
+...
