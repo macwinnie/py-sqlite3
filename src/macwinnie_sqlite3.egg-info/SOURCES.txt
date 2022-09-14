@@ -1,0 +1,14 @@
+LICENSE
+MANIFEST.in
+Pipfile
+README.md
+buildconfig.json
+pyproject.toml
+setup.py
+src/macwinnie_sqlite3/SQLite.py
+src/macwinnie_sqlite3/__init__.py
+src/macwinnie_sqlite3.egg-info/PKG-INFO
+src/macwinnie_sqlite3.egg-info/SOURCES.txt
+src/macwinnie_sqlite3.egg-info/dependency_links.txt
+src/macwinnie_sqlite3.egg-info/requires.txt
+src/macwinnie_sqlite3.egg-info/top_level.txt

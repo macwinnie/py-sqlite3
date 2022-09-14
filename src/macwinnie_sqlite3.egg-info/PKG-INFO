@@ -1,0 +1,20 @@
+Metadata-Version: 2.1
+Name: macwinnie-sqlite3
+Version: 1.0.0
+Summary: Pushover client for Python projects.
+Home-page: https://github.com/macwinnie/python-pushover
+Author: macwinnie
+Author-email: dev@macwinnie.me
+License: AGPL-3.0-or-later
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+## SQLite Interface
+
+Interface for basic interactions with SQLite databases in Python projects.
+
+The detailled documentation can be found at [GitHub](https://macwinnie.github.io/py-sqlite3).
