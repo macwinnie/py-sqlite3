@@ -53,7 +53,9 @@ cd "${curPath}"
 # run tests
 FILES="$( pwd )/tests/*.py"
 for f in ${FILES}; do
-    python "${f}"
+    if [[ "${f}" != "${FILES}" ]]; then
+        python "${f}"
+    fi
 done
 
 # build python library
