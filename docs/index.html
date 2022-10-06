@@ -6,28 +6,49 @@
   <body>
     <h1>SQLite interface by <a target="_blank" href="https://twitter.com/macwinnie">@macwinnie</a></h1>
     <p>
-            This is the documentation overview for SQLite interface by <a target="_blank" href="https://twitter.com/macwinnie">@macwinnie</a>.
-        </p>
+        This is the documentation overview for SQLite interface by <a target="_blank" href="https://twitter.com/macwinnie">@macwinnie</a>.
+    </p>
     <p>
-            To install this package, please run:<br/><br/>
-            <pre>
-                pip install macwinnie_sqlite3
-            </pre>
-        </p>
+        To install this package, please run:
+    </p>
+    <pre>
+        pip install macwinnie_sqlite3
+    </pre>
     <p>
-            Usage could then e.g. be:
-            <pre>
-                from macwinnie_sqlite3 import SQLite
+         Usage could then e.g. be – with some <a target="_blank" href="https://pypi.org/project/yoyo-migrations/">yoyo-migrations</a> within the directory <code>db_migrations</code>:
+    </p>
+    <pre>
+        from macwinnie_sqlite3 import SQLite
 
-                # example is ToDo ...
-            </pre>
-        </p>
+        db_file = "{}/{}".format(
+            os.getcwd(),
+            "database.sqlite"
+        )
+        db_migrations_path = "{}/{}".format(
+            os.getcwd(),
+            "db_migrations"
+        )
+
+        db = SQLite.database(db_file, db_migrations_path)
+        # # or you can also do it like this in two steps:
+        # db = SQLite.database(db_file)
+        # db.migrate(db_migrations_path)
+
+        sql = "SELECT name FROM pragma_table_info( 'TableCreatedByYoyo' ) ORDER BY cid;"
+        db.startAction()
+        db execute(sql)
+        colNames = [n[0] for n in db.fetchall()]
+        db.close()
+    </pre>
+    <p style="font-style: italic;">
+        This short example retrieves all table attributes within the table <code>TableCreatedByYoyo</code> which has to be created first by a yoyo migration.
+    </p>
     <p>
-            The Sourcecode of the package can be found on <a target="_blank" href="https://github.com/macwinnie/py-sqlite3">GitHub</a>, the documentation you currently are reading can be found at <a href="https://macwinnie.github.io/py-sqlite3/">GitHub Pages</a> and was last updated on <span id="update_date">Wed Sep 14 21:06:03 UTC 2022</span>.
-        </p>
+        The Sourcecode of the package can be found on <a target="_blank" href="https://github.com/macwinnie/py-sqlite3">GitHub</a>, the documentation you currently are reading can be found at <a href="https://macwinnie.github.io/py-sqlite3/">GitHub Pages</a> and was last updated on <span id="update_date">Wed Sep 14 21:06:03 UTC 2022</span>.
+    </p>
     <p>
-            Feel free to inspect the specific module documentations:
-            <ul id="doc_list"><li><a target="_blank" href="mods/SQLite.html">SQLite.html</a></li></ul>
-        </p>
+        Feel free to inspect the specific module documentations:
+        <ul id="doc_list"><li><a target="_blank" href="mods/SQLite.html">SQLite.html</a></li></ul>
+    </p>
   </body>
 </html>
