@@ -16,6 +16,7 @@ class database:
 
     def __getattr__(self, name):
         """magic method to use given methods of database response objects like `fetchall` or `fetchone`."""
+
         # args:   positional arguments
         # kwargs: keyword arguments
         def method(*args, **kwargs):
