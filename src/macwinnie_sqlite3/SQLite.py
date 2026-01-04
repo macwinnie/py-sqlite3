@@ -7,11 +7,9 @@ import sqlite3, yoyo, os
 
 class database:
 
-    connection = None
-    result = None
-    dbPath = None
-
     def __init__(self, dbPath, migrationsPath=None):
+        self.connection = None
+        self.result = None
         self.dbPath = dbPath
         if migrationsPath != None:
             self.migrate(migrationsPath)
@@ -38,7 +36,8 @@ class database:
         # ensure all DB migrations are applied
         backend = yoyo.get_backend(backendS)
         migrations = yoyo.read_migrations(migrationsPath)
-        backend.apply_migrations(backend.to_apply(migrations))
+        with backend.lock():
+            backend.apply_migrations(backend.to_apply(migrations))
 
     def startAction(self):
         """Connect to database and so start an action"""
@@ -46,8 +45,10 @@ class database:
             raise Exception("DB already connected!")
         self.connection = sqlite3.connect(self.dbPath)
 
-    def execute(self, query, params=[]):
+    def execute(self, query, params=None):
         """execute SQL statement on database"""
+        if params is None:
+            params = []
         self.result = self.connection.cursor()
         self.result.execute(query, params)
 
@@ -56,8 +57,10 @@ class database:
         self.connection.commit()
         self.close()
 
-    def fullExecute(self, query, params=[]):
+    def fullExecute(self, query, params=None):
         """combination method for a full transaction"""
+        if params is None:
+            params = []
         self.startAction()
         self.execute(query, params)
         self.commitAction()
