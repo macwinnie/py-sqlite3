@@ -12,10 +12,10 @@ from typing import Any
 
 import yoyo
 
-
 # ----------------
 # Logging setup
 # ----------------
+
 
 def _setup_logger() -> logging.Logger:
     logger = logging.getLogger("macwinnie.sqlite")
@@ -25,9 +25,7 @@ def _setup_logger() -> logging.Logger:
         level = getattr(logging, level_name, logging.INFO)
 
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] [sqlite] %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] [sqlite] %(message)s")
         handler.setFormatter(formatter)
 
         logger.addHandler(handler)
@@ -43,6 +41,7 @@ log = _setup_logger()
 # Exceptions
 # ----------------
 
+
 class DatabaseError(Exception):
     pass
 
@@ -50,6 +49,7 @@ class DatabaseError(Exception):
 # ----------------
 # Database class
 # ----------------
+
 
 class database:
     def __init__(self, dbPath: str | Path, migrationsPath: str | Path | None = None):
@@ -78,8 +78,10 @@ class database:
 
         attr = getattr(self.result, name)
         if callable(attr):
+
             def method(*args, **kwargs):
                 return attr(*args, **kwargs)
+
             return method
         return attr
 

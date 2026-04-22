@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
 <title>SQLite API documentation</title>
-<meta name="description" content="SQLite interface to be used with Python projects. Can be installed by `pip install macwinnie_sqlite3`">
+<meta name="description" content="SQLite interface to be used with Python projects.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,7 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>SQLite</code></h1>
 </header>
 <section id="section-intro">
-<p>SQLite interface to be used with Python projects. Can be installed by <code>pip install macwinnie_sqlite3</code></p>
+<p>SQLite interface to be used with Python projects.</p>
 </section>
 <section>
 </section>
@@ -47,9 +47,28 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="SQLite.DatabaseError"><code class="flex name class">
+<span>class <span class="ident">DatabaseError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class DatabaseError(Exception):
+    pass</code></pre>
+</details>
+<div class="desc"><p>Common base class for all non-exit exceptions.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
 <dt id="SQLite.database"><code class="flex name class">
 <span>class <span class="ident">database</span></span>
-<span>(</span><span>dbPath, migrationsPath=None)</span>
+<span>(</span><span>dbPath: str | Path, migrationsPath: str | Path | None = None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -57,246 +76,410 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class database:
+    def __init__(self, dbPath: str | Path, migrationsPath: str | Path | None = None):
+        self.connection: sqlite3.Connection | None = None
+        self.result: sqlite3.Cursor | None = None
+        self.dbPath = Path(dbPath).expanduser()
 
-    def __init__(self, dbPath, migrationsPath=None):
-        self.connection = None
-        self.result = None
-        self.dbPath = dbPath
-        if migrationsPath != None:
+        log.info(f&#34;Initializing SQLite DB at {self.dbPath}&#34;)
+
+        self._ensure_parent_dir_exists()
+
+        if migrationsPath is not None:
+            log.info(f&#34;Running migrations from {migrationsPath}&#34;)
             self.migrate(migrationsPath)
 
-    def __getattr__(self, name):
-        &#34;&#34;&#34;magic method to use given methods of database response objects like `fetchall` or `fetchone`.&#34;&#34;&#34;
+    def __getattr__(self, name: str):
+        &#34;&#34;&#34;
+        magic method to use given methods of database response objects like `fetchall` or `fetchone`.
 
-        # args:   positional arguments
-        # kwargs: keyword arguments
-        def method(*args, **kwargs):
-            cllbl = getattr(self.result, name)
-            if callable(cllbl):
-                return cllbl(*args, **kwargs)
-            else:
-                return cllbl
+        name:   method or attribute to run
+        args:   positional arguments
+        kwargs: keyword arguments
+        &#34;&#34;&#34;
+        if self.result is None:
+            raise AttributeError(f&#34;No active result for &#39;{name}&#39;&#34;)
 
-        return method
+        attr = getattr(self.result, name)
+        if callable(attr):
 
-    def migrate(self, migrationsPath):
-        &#34;&#34;&#34;Method to apply yoyo-migrations to database&#34;&#34;&#34;
-        backendS = &#34;sqlite:///{}&#34;.format(self.dbPath)
-        # ensure DB file exists
-        if not os.path.isfile(self.dbPath):
-            open(self.dbPath, &#34;w&#34;).close()
-        # ensure all DB migrations are applied
-        backend = yoyo.get_backend(backendS)
-        migrations = yoyo.read_migrations(migrationsPath)
-        with backend.lock():
-            backend.apply_migrations(backend.to_apply(migrations))
+            def method(*args, **kwargs):
+                return attr(*args, **kwargs)
 
-    def startAction(self):
+            return method
+        return attr
+
+    # ----------------
+    # Setup helpers
+    # ----------------
+
+    def _ensure_parent_dir_exists(self) -&gt; None:
+        if not self.dbPath.parent.exists():
+            log.debug(f&#34;Creating directory {self.dbPath.parent}&#34;)
+        self.dbPath.parent.mkdir(parents=True, exist_ok=True)
+
+    def _ensure_db_file_exists(self) -&gt; None:
+        if not self.dbPath.exists():
+            log.info(f&#34;Creating DB file {self.dbPath}&#34;)
+        self.dbPath.touch(exist_ok=True)
+
+    def _backend_url(self) -&gt; str:
+        return f&#34;sqlite:///{self.dbPath.resolve().as_posix()}&#34;
+
+    # ----------------
+    # Migration
+    # ----------------
+
+    def migrate(self, migrationsPath: str | Path) -&gt; None:
+        self._ensure_db_file_exists()
+
+        backend_url = self._backend_url()
+        log.debug(f&#34;Using backend {backend_url}&#34;)
+
+        backend = yoyo.get_backend(backend_url)
+        migrations = yoyo.read_migrations(str(Path(migrationsPath)))
+
+        log.debug(f&#34;Loaded {len(migrations)} migrations&#34;)
+
+        try:
+            to_apply = backend.to_apply(migrations)
+            log.info(f&#34;Migrations pending: {len(to_apply)}&#34;)
+
+            if not to_apply:
+                log.info(&#34;No migrations to apply&#34;)
+                return
+
+            log.debug(&#34;Acquiring migration lock&#34;)
+            with backend.lock():
+                log.debug(&#34;Applying migrations&#34;)
+                backend.apply_migrations(to_apply)
+
+            log.info(&#34;Migrations applied successfully&#34;)
+
+        except Exception as exc:
+            log.exception(&#34;Migration failed&#34;)
+            raise
+
+    # ----------------
+    # Connection handling
+    # ----------------
+
+    def startAction(self) -&gt; None:
         &#34;&#34;&#34;Connect to database and so start an action&#34;&#34;&#34;
-        if self.connection != None:
-            raise Exception(&#34;DB already connected!&#34;)
-        self.connection = sqlite3.connect(self.dbPath)
+        if self.connection is not None:
+            raise DatabaseError(&#34;DB already connected!&#34;)
 
-    def execute(self, query, params=None):
+        log.debug(&#34;Opening SQLite connection&#34;)
+        self.connection = sqlite3.connect(str(self.dbPath))
+
+    def execute(self, query: str, params: list[Any] | tuple[Any, ...] | None = None) -&gt; None:
         &#34;&#34;&#34;execute SQL statement on database&#34;&#34;&#34;
+        if self.connection is None:
+            raise DatabaseError(&#34;No active DB connection. Call startAction().&#34;)
+
         if params is None:
             params = []
+
+        log.debug(f&#34;Executing SQL: {query} | params={params}&#34;)
+
         self.result = self.connection.cursor()
         self.result.execute(query, params)
 
-    def commitAction(self):
+    def commitAction(self) -&gt; None:
         &#34;&#34;&#34;commit your actions done through the execute statements between `startAction` and `commitAction` – so finish the transaction.&#34;&#34;&#34;
-        self.connection.commit()
-        self.close()
+        if self.connection is None:
+            raise DatabaseError(&#34;No active DB connection to commit.&#34;)
 
-    def fullExecute(self, query, params=None):
+        log.debug(&#34;Committing transaction&#34;)
+
+        try:
+            self.connection.commit()
+        finally:
+            self.close()
+
+    def rollbackAction(self) -&gt; None:
+        &#34;&#34;&#34;method to roll back executed statements from `startAction` until `rollbackAction` without `commitAction` has been invoked.&#34;&#34;&#34;
+        if self.connection is None:
+            raise DatabaseError(&#34;No active DB connection to rollback.&#34;)
+
+        log.warning(&#34;Rolling back transaction&#34;)
+
+        try:
+            self.connection.rollback()
+        finally:
+            self.close()
+
+    def fullExecute(self, query: str, params: list[Any] | tuple[Any, ...] | None = None) -&gt; None:
         &#34;&#34;&#34;combination method for a full transaction&#34;&#34;&#34;
         if params is None:
             params = []
+
+        log.debug(&#34;Starting fullExecute transaction&#34;)
+
         self.startAction()
-        self.execute(query, params)
-        self.commitAction()
+        try:
+            self.execute(query, params)
+            self.commitAction()
+        except Exception:
+            log.exception(&#34;fullExecute failed, rolling back&#34;)
+            self.rollbackAction()
+            raise
 
-    def rollbackAction(self):
-        &#34;&#34;&#34;method to roll back executed statements from `startAction` until `rollbackAction` without `commitAction` has been invoked.&#34;&#34;&#34;
-        self.connection.rollback()
-        self.close()
-
-    def close(self):
+    def close(self) -&gt; None:
         &#34;&#34;&#34;clean close of the database connection&#34;&#34;&#34;
-        self.connection.close()
+        if self.connection is not None:
+            log.debug(&#34;Closing SQLite connection&#34;)
+            self.connection.close()
+
         self.connection = None
+        self.result = None
 
-    def fetchallNamed(self):
+    # ----------------
+    # Fetch helpers
+    # ----------------
+
+    def fetchallNamed(self) -&gt; list[dict[str, Any]]:
         &#34;&#34;&#34;regular `fetchall` for the results of `SELECT` statements executed return lists of lists of values. This method migrates those inner lists to key-value dicts.&#34;&#34;&#34;
-        rowKeys = [i[0] for i in self.description()]
-        allResults = self.fetchall()
-        allReturn = []
-        for ar in allResults:
-            allReturn.append(dict(zip(rowKeys, ar)))
-        return allReturn
+        if self.result is None or self.result.description is None:
+            raise DatabaseError(&#34;No active SELECT result.&#34;)
 
-    def fetchoneNamed(self):
+        rowKeys = [col[0] for col in self.result.description]
+        rows = self.result.fetchall()
+
+        log.debug(f&#34;Fetched {len(rows)} rows&#34;)
+
+        return [dict(zip(rowKeys, row)) for row in rows]
+
+    def fetchoneNamed(self) -&gt; dict[str, Any] | None:
         &#34;&#34;&#34;regular `fetchone` for results of `SELECT` statements executed return a list of values. This method migrates those lists to key-value dicts.&#34;&#34;&#34;
-        rowKeys = [i[0] for i in self.description()]
-        results = self.fetchone()
-        toReturn = dict(zip(rowKeys, results))
-        return toReturn</code></pre>
+        if self.result is None or self.result.description is None:
+            raise DatabaseError(&#34;No active SELECT result.&#34;)
+
+        rowKeys = [col[0] for col in self.result.description]
+        row = self.result.fetchone()
+
+        if row is None:
+            log.debug(&#34;fetchone returned no result&#34;)
+            return None
+
+        return dict(zip(rowKeys, row))</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
 <dt id="SQLite.database.close"><code class="name flex">
-<span>def <span class="ident">close</span></span>(<span>self)</span>
+<span>def <span class="ident">close</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def close(self):
+<pre><code class="python">def close(self) -&gt; None:
     &#34;&#34;&#34;clean close of the database connection&#34;&#34;&#34;
-    self.connection.close()
-    self.connection = None</code></pre>
+    if self.connection is not None:
+        log.debug(&#34;Closing SQLite connection&#34;)
+        self.connection.close()
+
+    self.connection = None
+    self.result = None</code></pre>
 </details>
 <div class="desc"><p>clean close of the database connection</p></div>
 </dd>
 <dt id="SQLite.database.commitAction"><code class="name flex">
-<span>def <span class="ident">commitAction</span></span>(<span>self)</span>
+<span>def <span class="ident">commitAction</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def commitAction(self):
+<pre><code class="python">def commitAction(self) -&gt; None:
     &#34;&#34;&#34;commit your actions done through the execute statements between `startAction` and `commitAction` – so finish the transaction.&#34;&#34;&#34;
-    self.connection.commit()
-    self.close()</code></pre>
+    if self.connection is None:
+        raise DatabaseError(&#34;No active DB connection to commit.&#34;)
+
+    log.debug(&#34;Committing transaction&#34;)
+
+    try:
+        self.connection.commit()
+    finally:
+        self.close()</code></pre>
 </details>
 <div class="desc"><p>commit your actions done through the execute statements between <code>startAction</code> and <code>commitAction</code> – so finish the transaction.</p></div>
 </dd>
 <dt id="SQLite.database.execute"><code class="name flex">
-<span>def <span class="ident">execute</span></span>(<span>self, query, params=None)</span>
+<span>def <span class="ident">execute</span></span>(<span>self, query: str, params: list[Any] | tuple[Any, ...] | None = None) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def execute(self, query, params=None):
+<pre><code class="python">def execute(self, query: str, params: list[Any] | tuple[Any, ...] | None = None) -&gt; None:
     &#34;&#34;&#34;execute SQL statement on database&#34;&#34;&#34;
+    if self.connection is None:
+        raise DatabaseError(&#34;No active DB connection. Call startAction().&#34;)
+
     if params is None:
         params = []
+
+    log.debug(f&#34;Executing SQL: {query} | params={params}&#34;)
+
     self.result = self.connection.cursor()
     self.result.execute(query, params)</code></pre>
 </details>
 <div class="desc"><p>execute SQL statement on database</p></div>
 </dd>
 <dt id="SQLite.database.fetchallNamed"><code class="name flex">
-<span>def <span class="ident">fetchallNamed</span></span>(<span>self)</span>
+<span>def <span class="ident">fetchallNamed</span></span>(<span>self) ‑> list[dict[str, typing.Any]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fetchallNamed(self):
+<pre><code class="python">def fetchallNamed(self) -&gt; list[dict[str, Any]]:
     &#34;&#34;&#34;regular `fetchall` for the results of `SELECT` statements executed return lists of lists of values. This method migrates those inner lists to key-value dicts.&#34;&#34;&#34;
-    rowKeys = [i[0] for i in self.description()]
-    allResults = self.fetchall()
-    allReturn = []
-    for ar in allResults:
-        allReturn.append(dict(zip(rowKeys, ar)))
-    return allReturn</code></pre>
+    if self.result is None or self.result.description is None:
+        raise DatabaseError(&#34;No active SELECT result.&#34;)
+
+    rowKeys = [col[0] for col in self.result.description]
+    rows = self.result.fetchall()
+
+    log.debug(f&#34;Fetched {len(rows)} rows&#34;)
+
+    return [dict(zip(rowKeys, row)) for row in rows]</code></pre>
 </details>
 <div class="desc"><p>regular <code>fetchall</code> for the results of <code>SELECT</code> statements executed return lists of lists of values. This method migrates those inner lists to key-value dicts.</p></div>
 </dd>
 <dt id="SQLite.database.fetchoneNamed"><code class="name flex">
-<span>def <span class="ident">fetchoneNamed</span></span>(<span>self)</span>
+<span>def <span class="ident">fetchoneNamed</span></span>(<span>self) ‑> dict[str, typing.Any] | None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fetchoneNamed(self):
+<pre><code class="python">def fetchoneNamed(self) -&gt; dict[str, Any] | None:
     &#34;&#34;&#34;regular `fetchone` for results of `SELECT` statements executed return a list of values. This method migrates those lists to key-value dicts.&#34;&#34;&#34;
-    rowKeys = [i[0] for i in self.description()]
-    results = self.fetchone()
-    toReturn = dict(zip(rowKeys, results))
-    return toReturn</code></pre>
+    if self.result is None or self.result.description is None:
+        raise DatabaseError(&#34;No active SELECT result.&#34;)
+
+    rowKeys = [col[0] for col in self.result.description]
+    row = self.result.fetchone()
+
+    if row is None:
+        log.debug(&#34;fetchone returned no result&#34;)
+        return None
+
+    return dict(zip(rowKeys, row))</code></pre>
 </details>
 <div class="desc"><p>regular <code>fetchone</code> for results of <code>SELECT</code> statements executed return a list of values. This method migrates those lists to key-value dicts.</p></div>
 </dd>
 <dt id="SQLite.database.fullExecute"><code class="name flex">
-<span>def <span class="ident">fullExecute</span></span>(<span>self, query, params=None)</span>
+<span>def <span class="ident">fullExecute</span></span>(<span>self, query: str, params: list[Any] | tuple[Any, ...] | None = None) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fullExecute(self, query, params=None):
+<pre><code class="python">def fullExecute(self, query: str, params: list[Any] | tuple[Any, ...] | None = None) -&gt; None:
     &#34;&#34;&#34;combination method for a full transaction&#34;&#34;&#34;
     if params is None:
         params = []
+
+    log.debug(&#34;Starting fullExecute transaction&#34;)
+
     self.startAction()
-    self.execute(query, params)
-    self.commitAction()</code></pre>
+    try:
+        self.execute(query, params)
+        self.commitAction()
+    except Exception:
+        log.exception(&#34;fullExecute failed, rolling back&#34;)
+        self.rollbackAction()
+        raise</code></pre>
 </details>
 <div class="desc"><p>combination method for a full transaction</p></div>
 </dd>
 <dt id="SQLite.database.migrate"><code class="name flex">
-<span>def <span class="ident">migrate</span></span>(<span>self, migrationsPath)</span>
+<span>def <span class="ident">migrate</span></span>(<span>self, migrationsPath: str | Path) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def migrate(self, migrationsPath):
-    &#34;&#34;&#34;Method to apply yoyo-migrations to database&#34;&#34;&#34;
-    backendS = &#34;sqlite:///{}&#34;.format(self.dbPath)
-    # ensure DB file exists
-    if not os.path.isfile(self.dbPath):
-        open(self.dbPath, &#34;w&#34;).close()
-    # ensure all DB migrations are applied
-    backend = yoyo.get_backend(backendS)
-    migrations = yoyo.read_migrations(migrationsPath)
-    with backend.lock():
-        backend.apply_migrations(backend.to_apply(migrations))</code></pre>
+<pre><code class="python">def migrate(self, migrationsPath: str | Path) -&gt; None:
+    self._ensure_db_file_exists()
+
+    backend_url = self._backend_url()
+    log.debug(f&#34;Using backend {backend_url}&#34;)
+
+    backend = yoyo.get_backend(backend_url)
+    migrations = yoyo.read_migrations(str(Path(migrationsPath)))
+
+    log.debug(f&#34;Loaded {len(migrations)} migrations&#34;)
+
+    try:
+        to_apply = backend.to_apply(migrations)
+        log.info(f&#34;Migrations pending: {len(to_apply)}&#34;)
+
+        if not to_apply:
+            log.info(&#34;No migrations to apply&#34;)
+            return
+
+        log.debug(&#34;Acquiring migration lock&#34;)
+        with backend.lock():
+            log.debug(&#34;Applying migrations&#34;)
+            backend.apply_migrations(to_apply)
+
+        log.info(&#34;Migrations applied successfully&#34;)
+
+    except Exception as exc:
+        log.exception(&#34;Migration failed&#34;)
+        raise</code></pre>
 </details>
-<div class="desc"><p>Method to apply yoyo-migrations to database</p></div>
+<div class="desc"></div>
 </dd>
 <dt id="SQLite.database.rollbackAction"><code class="name flex">
-<span>def <span class="ident">rollbackAction</span></span>(<span>self)</span>
+<span>def <span class="ident">rollbackAction</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def rollbackAction(self):
+<pre><code class="python">def rollbackAction(self) -&gt; None:
     &#34;&#34;&#34;method to roll back executed statements from `startAction` until `rollbackAction` without `commitAction` has been invoked.&#34;&#34;&#34;
-    self.connection.rollback()
-    self.close()</code></pre>
+    if self.connection is None:
+        raise DatabaseError(&#34;No active DB connection to rollback.&#34;)
+
+    log.warning(&#34;Rolling back transaction&#34;)
+
+    try:
+        self.connection.rollback()
+    finally:
+        self.close()</code></pre>
 </details>
 <div class="desc"><p>method to roll back executed statements from <code>startAction</code> until <code>rollbackAction</code> without <code>commitAction</code> has been invoked.</p></div>
 </dd>
 <dt id="SQLite.database.startAction"><code class="name flex">
-<span>def <span class="ident">startAction</span></span>(<span>self)</span>
+<span>def <span class="ident">startAction</span></span>(<span>self) ‑> None</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def startAction(self):
+<pre><code class="python">def startAction(self) -&gt; None:
     &#34;&#34;&#34;Connect to database and so start an action&#34;&#34;&#34;
-    if self.connection != None:
-        raise Exception(&#34;DB already connected!&#34;)
-    self.connection = sqlite3.connect(self.dbPath)</code></pre>
+    if self.connection is not None:
+        raise DatabaseError(&#34;DB already connected!&#34;)
+
+    log.debug(&#34;Opening SQLite connection&#34;)
+    self.connection = sqlite3.connect(str(self.dbPath))</code></pre>
 </details>
 <div class="desc"><p>Connect to database and so start an action</p></div>
 </dd>
@@ -312,6 +495,9 @@ el.replaceWith(d);
 <ul id="index">
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
+<li>
+<h4><code><a title="SQLite.DatabaseError" href="#SQLite.DatabaseError">DatabaseError</a></code></h4>
+</li>
 <li>
 <h4><code><a title="SQLite.database" href="#SQLite.database">database</a></code></h4>
 <ul class="two-column">
