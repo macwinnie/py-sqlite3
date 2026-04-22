@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: macwinnie_sqlite3
-Version: 1.1.1
+Version: 1.1.2
 Summary: Pushover client for Python projects.
 Home-page: https://github.com/macwinnie/python-pushover
 Author: macwinnie
